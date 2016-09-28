@@ -511,7 +511,8 @@ db.define_table("submission",
                 Field("status"),
                 Field("points"),
                 Field("view_link",
-                      default=""))
+                      default=""),
+                format="submission #%(id)s")
 
 db.define_table("friend_requests",
                 Field("from_h", "reference auth_user"),
@@ -627,6 +628,13 @@ db.define_table("contest_logging",
                 Field("contest_details", "text"),
                 Field("stopstalk_handle"),
                 Field("time_stamp", "datetime"))
+
+db.define_table("solved_problem",
+                Field("user_id", "reference auth_user"),
+                Field("custom_user_id", "reference custom_friend"),
+                Field("time_stamp", "datetime"),
+                Field("problem_link"),
+                format="%(user_id)s %(custom_user_id)s")
 
 def get_solved_problems(user_id):
     """

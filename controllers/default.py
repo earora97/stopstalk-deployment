@@ -115,6 +115,95 @@ def handle_error():
     return dict(error_message=error_message, similar_handles=similar_handles)
 
 # ----------------------------------------------------------------------------
+def recommend():
+
+    sptable = db.solved_problem
+    stable = db.submission
+    pttable = db.problem_tags
+    atable = db.auth_user
+
+    record = db(atable.stopstalk_handle == request.args[0]).select().first()
+
+    query = (stable.user_id == record.id) & (stable.status == "AC")
+    problems = db(query).select(stable.problem_link, distinct=True)
+    solved_problems = set([x.problem_link for x in problems])
+
+    print request.args[0], len(solved_problems)
+    query = (stable.user_id == record.id) & \
+            (stable.status == "AC")
+
+    sql_query = """
+                    SELECT DISTINCT(problem_link)
+                    FROM submission
+                    WHERE user_id=%d AND status='AC'
+                    ORDER BY time_stamp DESC
+                    LIMIT 10
+                """ % record.id
+    res = db.executesql(sql_query)
+    last_solved_problems = [x[0] for x in res]
+    next_attempted = {}
+    for problem in last_solved_problems:
+        rows = db(sptable.problem_link == problem).select()
+        user_ids = []
+        custom_user_ids = []
+        for x in rows:
+            if x.user_id == record.id:
+                continue
+            if x.user_id:
+                query = (stable.user_id == x.user_id)
+            else:
+                query = (stable.custom_user_id == x.custom_user_id)
+
+            query &= (stable.time_stamp > x.time_stamp)
+            next_problems = db(query).select(stable.problem_link,
+                                             distinct=True,
+                                             limitby=(0, 20))
+            for next_problem in next_problems:
+                plink = next_problem.problem_link
+                if next_attempted.has_key(plink) is False:
+                    next_attempted[plink] = {"user_ids": set([]),
+                                             "custom_user_ids": set([])}
+                if x.user_id:
+                    next_attempted[plink]["user_ids"].add(x.user_id)
+                else:
+                    next_attempted[plink]["custom_user_ids"].add(x.custom_user_id)
+
+    final_list = sorted(next_attempted.items(),
+                        key=lambda k: len(k[1]["user_ids"]) + \
+                                      len(k[1]["custom_user_ids"]),
+                        reverse=True)
+    RECOMMEND_COUNT = 20
+    recommended_problems = []
+    for i in final_list:
+        if i[0] in solved_problems:
+            continue
+        recommended_problems.append((i[0],
+                                     len(i[1]["user_ids"]) + \
+                                     len(i[1]["custom_user_ids"])))
+        if len(recommended_problems) == RECOMMEND_COUNT:
+            break
+
+    query = (pttable.problem_link.belongs([x[0] for x in recommended_problems]))
+    problems = db(query).select(pttable.problem_link,
+                                pttable.problem_name)
+    plink_to_name = {}
+    for prob in problems:
+        plink_to_name[prob.problem_link] = prob.problem_name
+
+    table = TABLE(_class="centered striped col s6 offset-s3")
+    table.append(THEAD(TR(TH("Problem"), TH("User count"))))
+    tbody = TBODY()
+    for prob in recommended_problems:
+        pname = plink_to_name[prob[0]]
+        tbody.append(TR(TD(A(pname,
+                             _href=URL("problems", "index",
+                                       vars={"plink": prob[0],
+                                             "pname": pname}))),
+                        TD(prob[1])))
+    table.append(tbody)
+    return dict(table=DIV(table, _class="row"))
+
+# ----------------------------------------------------------------------------
 def index():
     """
         The main controller which redirects depending
