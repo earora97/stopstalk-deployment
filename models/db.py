@@ -636,6 +636,12 @@ db.define_table("solved_problem",
                 Field("problem_link"),
                 format="%(user_id)s %(custom_user_id)s")
 
+db.define_table("combined_rating",
+                Field("user_id", "reference auth_user"),
+                Field("custom_user_id", "reference custom_friend"),
+                Field("stopstalk_handle"),
+                Field("curr_rating", "integer", default=0))
+
 def get_solved_problems(user_id):
     """
         Get the solved and unsolved problems of a user

@@ -119,8 +119,9 @@ def recommend():
 
     sptable = db.solved_problem
     stable = db.submission
-    pttable = db.problem_tags
+    ptable = db.problem
     atable = db.auth_user
+    crtable = db.combined_rating
 
     record = db(atable.stopstalk_handle == request.args[0]).select().first()
 
@@ -128,7 +129,17 @@ def recommend():
     problems = db(query).select(stable.problem_link, distinct=True)
     solved_problems = set([x.problem_link for x in problems])
 
-    print request.args[0], len(solved_problems)
+    rankings = db(crtable).select(orderby=~crtable.curr_rating)
+    index = [x.curr_rating for x in rankings].index(int(record.rating))
+    window = rankings[index - 20 if index >= 20 else 0: index + 40]
+    allowed_user_ids = set([])
+    allowed_custom_user_ids = set([])
+    for user in window:
+        if user.user_id:
+            allowed_user_ids.add(user.user_id)
+        else:
+            allowed_custom_user_ids.add(user.custom_user_id)
+
     query = (stable.user_id == record.id) & \
             (stable.status == "AC")
 
@@ -141,6 +152,7 @@ def recommend():
                 """ % record.id
     res = db.executesql(sql_query)
     last_solved_problems = [x[0] for x in res]
+
     next_attempted = {}
     for problem in last_solved_problems:
         rows = db(sptable.problem_link == problem).select()
@@ -163,9 +175,9 @@ def recommend():
                 if next_attempted.has_key(plink) is False:
                     next_attempted[plink] = {"user_ids": set([]),
                                              "custom_user_ids": set([])}
-                if x.user_id:
+                if x.user_id and x.user_id in allowed_user_ids:
                     next_attempted[plink]["user_ids"].add(x.user_id)
-                else:
+                elif x.custom_user_id and x.custom_user_id in allowed_custom_user_ids:
                     next_attempted[plink]["custom_user_ids"].add(x.custom_user_id)
 
     final_list = sorted(next_attempted.items(),
@@ -183,12 +195,12 @@ def recommend():
         if len(recommended_problems) == RECOMMEND_COUNT:
             break
 
-    query = (pttable.problem_link.belongs([x[0] for x in recommended_problems]))
-    problems = db(query).select(pttable.problem_link,
-                                pttable.problem_name)
+    query = (ptable.link.belongs([x[0] for x in recommended_problems]))
+    problems = db(query).select(ptable.link,
+                                ptable.name)
     plink_to_name = {}
     for prob in problems:
-        plink_to_name[prob.problem_link] = prob.problem_name
+        plink_to_name[prob.link] = prob.name
 
     table = TABLE(_class="centered striped col s6 offset-s3")
     table.append(THEAD(TR(TH("Problem"), TH("User count"))))
