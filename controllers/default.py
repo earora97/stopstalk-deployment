@@ -184,7 +184,7 @@ def recommend():
                         key=lambda k: len(k[1]["user_ids"]) + \
                                       len(k[1]["custom_user_ids"]),
                         reverse=True)
-    RECOMMEND_COUNT = 20
+    RECOMMEND_COUNT = 10
     recommended_problems = []
     for i in final_list:
         if i[0] in solved_problems:
@@ -203,15 +203,14 @@ def recommend():
         plink_to_name[prob.link] = prob.name
 
     table = TABLE(_class="centered striped col s6 offset-s3")
-    table.append(THEAD(TR(TH("Problem"), TH("User count"))))
+    table.append(THEAD(TR(TH("Problem"))))
     tbody = TBODY()
     for prob in recommended_problems:
         pname = plink_to_name[prob[0]]
         tbody.append(TR(TD(A(pname,
                              _href=URL("problems", "index",
                                        vars={"plink": prob[0],
-                                             "pname": pname}))),
-                        TD(prob[1])))
+                                             "pname": pname})))))
     table.append(tbody)
     return dict(table=DIV(table, _class="row"))
 
